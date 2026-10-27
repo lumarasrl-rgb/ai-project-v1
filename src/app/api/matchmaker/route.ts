@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { simulateConversation } from "@/lib/ai/matchmaker";
 import { rankCandidates } from "@/lib/matching";
+import { QUOTA_MESSAGE, claimAiUsage } from "@/lib/rate-limit";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { AiSimulation, LookingFor, Profile } from "@/lib/types";
 
@@ -112,8 +113,16 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const simulations: AiSimulation[] = [];
+  let quotaSpent = false;
 
   for (const candidate of ranked) {
+    // Every candidate costs one Claude call, so the quota is claimed per
+    // candidate rather than per request.
+    if (!(await claimAiUsage(supabase, "simulation", request.headers))) {
+      quotaSpent = true;
+      break;
+    }
+
     // Claim the pair first, so two concurrent runs cannot duplicate it.
     const { data: claimed, error: claimError } = await supabase
       .from("ai_simulations")
@@ -165,12 +174,17 @@ export async function POST(request: Request): Promise<NextResponse> {
       ranked.length,
   );
 
-  return NextResponse.json<MatchmakerResponse>({
-    simulations,
-    remainingCandidates: remaining,
-    message:
-      simulations.length > 0
-        ? `${simulations.length} ${simulations.length === 1 ? "simulare" : "simulări"} finalizate.`
-        : "Simulările nu au putut fi finalizate. Încearcă din nou.",
-  });
+  let message: string;
+  if (simulations.length > 0) {
+    message = `${simulations.length} ${simulations.length === 1 ? "simulare" : "simulări"} finalizate.`;
+  } else if (quotaSpent) {
+    message = QUOTA_MESSAGE;
+  } else {
+    message = "Simulările nu au putut fi finalizate. Încearcă din nou.";
+  }
+
+  return NextResponse.json<MatchmakerResponse>(
+    { simulations, remainingCandidates: remaining, message },
+    { status: simulations.length === 0 && quotaSpent ? 429 : 200 },
+  );
 }

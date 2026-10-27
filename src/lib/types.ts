@@ -51,6 +51,15 @@ export type Message = {
   created_at: string;
 };
 
+/** One row per Claude call, used to cap spend. See `lib/rate-limit.ts`. */
+export type AiUsage = {
+  id: number;
+  user_id: string;
+  kind: "interview" | "simulation";
+  ip_hash: string | null;
+  created_at: string;
+};
+
 /** A simulation as the dashboard sees it: paired with the other person's profile. */
 export interface SimulationWithCounterpart {
   simulation: AiSimulation;
@@ -97,11 +106,21 @@ export interface Database {
         Update: Partial<Omit<Message, "id">>;
         Relationships: [];
       };
+      ai_usage: {
+        Row: AiUsage;
+        Insert: Omit<AiUsage, "id" | "created_at"> & { created_at?: string };
+        Update: Partial<Omit<AiUsage, "id">>;
+        Relationships: [];
+      };
     };
     Views: Record<never, never>;
     Functions: {
       is_simulation_participant: {
         Args: { target_simulation: number };
+        Returns: boolean;
+      };
+      claim_ai_usage: {
+        Args: { p_kind: string; p_ip_hash: string };
         Returns: boolean;
       };
     };

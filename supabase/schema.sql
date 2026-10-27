@@ -89,6 +89,86 @@ create table if not exists public.messages (
 create index if not exists messages_thread_idx on public.messages (simulation_id, created_at);
 
 -- ─────────────────────────────────────────────────────────────────────────────────
+--  ai_usage — one row per Claude call, so nobody can drain the API budget
+-- ─────────────────────────────────────────────────────────────────────────────────
+create table if not exists public.ai_usage (
+  id         bigint generated always as identity primary key,
+  user_id    uuid        not null references auth.users (id) on delete cascade,
+  kind       text        not null
+                         constraint ai_usage_kind_allowed
+                         check (kind in ('interview', 'simulation')),
+  -- Salted SHA-256 of the caller's IP. Anonymous sign-in makes new identities
+  -- free, so a per-user cap alone is not a cap at all; the raw address is
+  -- never stored.
+  ip_hash    text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists ai_usage_user_window_idx
+  on public.ai_usage (user_id, kind, created_at desc);
+create index if not exists ai_usage_ip_window_idx
+  on public.ai_usage (ip_hash, kind, created_at desc);
+
+/*
+ * Checks both quotas and records the call, in one transaction. The limits live
+ * here rather than in the application because this function is reachable over
+ * PostgREST — a caller must not be able to pass its own ceiling.
+ */
+create or replace function public.claim_ai_usage(p_kind text, p_ip_hash text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_limit int;
+  v_ip_limit   int;
+  v_user_count int;
+  v_ip_count   int;
+begin
+  if auth.uid() is null then
+    return false;
+  end if;
+
+  case p_kind
+    when 'interview'  then v_user_limit := 5;  v_ip_limit := 25;
+    when 'simulation' then v_user_limit := 20; v_ip_limit := 100;
+    else return false;
+  end case;
+
+  select count(*) into v_user_count
+    from public.ai_usage
+   where user_id = auth.uid()
+     and kind = p_kind
+     and created_at > now() - interval '24 hours';
+
+  if v_user_count >= v_user_limit then
+    return false;
+  end if;
+
+  if coalesce(p_ip_hash, '') <> '' then
+    select count(*) into v_ip_count
+      from public.ai_usage
+     where ip_hash = p_ip_hash
+       and kind = p_kind
+       and created_at > now() - interval '24 hours';
+
+    if v_ip_count >= v_ip_limit then
+      return false;
+    end if;
+  end if;
+
+  insert into public.ai_usage (user_id, kind, ip_hash)
+  values (auth.uid(), p_kind, nullif(p_ip_hash, ''));
+
+  return true;
+end;
+$$;
+
+revoke execute on function public.claim_ai_usage(text, text) from public, anon;
+grant execute on function public.claim_ai_usage(text, text) to authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────────
 --  Helper: is the current user a participant of a simulation?
 -- ─────────────────────────────────────────────────────────────────────────────────
 create or replace function public.is_simulation_participant(target_simulation bigint)

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { AiError } from "@/lib/ai/client";
 import { extractProfileSignals } from "@/lib/ai/interview";
+import { QUOTA_MESSAGE, claimAiUsage } from "@/lib/rate-limit";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { GENDERS, LOOKING_FOR, type Profile } from "@/lib/types";
 
@@ -55,6 +56,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const body = parsed.data;
+
+  if (!(await claimAiUsage(supabase, "interview", request.headers))) {
+    return NextResponse.json({ error: QUOTA_MESSAGE }, { status: 429 });
+  }
 
   let signals;
   try {

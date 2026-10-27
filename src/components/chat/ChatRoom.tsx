@@ -42,6 +42,7 @@ export function ChatRoom({
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [live, setLive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
@@ -71,12 +72,45 @@ export function ChatRoom({
         },
         (payload) => addMessage(payload.new),
       )
-      .subscribe();
+      .subscribe((status) => setLive(status === "SUBSCRIBED"));
 
     return () => {
+      setLive(false);
       void supabase.removeChannel(channel);
     };
   }, [addMessage, simulationId]);
+
+  /**
+   * Safety net. A room that silently stops updating is worse than a slow one,
+   * and the realtime channel can report SUBSCRIBED while delivering nothing
+   * (a misconfigured replication slot, a dropped socket, a sleeping tab). So
+   * reconcile on a timer as well — often while the socket is down, rarely
+   * while it is healthy. One indexed query against an id we already hold.
+   */
+  const latestId = useRef(0);
+  latestId.current = messages.at(-1)?.id ?? 0;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const reconcile = async () => {
+      const { data } = await createClient()
+        .from("messages")
+        .select("*")
+        .eq("simulation_id", simulationId)
+        .gt("id", latestId.current)
+        .order("created_at", { ascending: true });
+
+      if (cancelled || !data) return;
+      for (const message of data) addMessage(message);
+    };
+
+    const timer = setInterval(() => void reconcile(), live ? 20000 : 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [addMessage, live, simulationId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -154,10 +188,29 @@ export function ChatRoom({
 
         <div className="hairline mt-7" />
 
-        <p className="mt-6 text-[0.8125rem] leading-relaxed text-ghost">
-          Camera e anonimă. La fiecare 10 mesaje se deblochează un fragment din
-          celălalt — {reveals.length}/{REVEALS.length} până acum.
-        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[0.8125rem] leading-relaxed text-ghost">
+            Camera e anonimă. La fiecare 10 mesaje se deblochează un fragment din
+            celălalt — {reveals.length}/{REVEALS.length} până acum.
+          </p>
+          <span
+            className="flex shrink-0 items-center gap-2 text-[0.625rem] uppercase tracking-[0.22em] text-ghost"
+            title={
+              live
+                ? "Mesajele sosesc instant."
+                : "Conexiunea live lipsește; camera se sincronizează periodic."
+            }
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "size-[5px] rounded-full",
+                live ? "bg-dusk animate-breathe" : "bg-silver/25",
+              )}
+            />
+            {live ? "live" : "sincronizare"}
+          </span>
+        </div>
       </header>
 
       {/* ── Thread ─────────────────────────────────────────────────────────── */}
