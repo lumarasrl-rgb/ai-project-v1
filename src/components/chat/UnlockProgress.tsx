@@ -25,7 +25,9 @@ export function UnlockProgress({ messageCount }: { messageCount: number }) {
       </div>
 
       <div className="mx-auto flex w-full max-w-3xl justify-end px-6 pt-2.5">
-        <span className="text-[0.625rem] uppercase tracking-[0.22em] text-ghost">
+        {/* On a long thread this floats over the bubbles, so it carries its
+            own glass backing rather than sitting on bare text. */}
+        <span className="rounded-full border border-white/[0.05] bg-void/70 px-4 py-1.5 text-[0.625rem] uppercase tracking-[0.22em] text-ghost backdrop-blur-md">
           {upcoming
             ? `${upcoming.label} · încă ${remaining} ${remaining === 1 ? "mesaj" : "mesaje"}`
             : "totul deblocat"}
