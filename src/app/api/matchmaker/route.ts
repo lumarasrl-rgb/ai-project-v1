@@ -9,8 +9,12 @@ import type { AiSimulation, LookingFor, Profile } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-/** Each simulation is one Claude call; keep the request alive long enough. */
-export const maxDuration = 120;
+/**
+ * Each simulation is one Claude call. 60s is the ceiling on Vercel's Hobby
+ * plan — asking for more there fails the deployment outright. On Pro this can
+ * go up to 300, which is worth doing before raising the per-request limit.
+ */
+export const maxDuration = 60;
 
 const BodySchema = z
   .object({ limit: z.coerce.number().int().min(1).max(3).default(2) })

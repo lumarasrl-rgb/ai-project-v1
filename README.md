@@ -155,7 +155,41 @@ la Claude. Rulează pe runner-ul din Node, fără framework instalat.
 
 ---
 
-## 7. Ce a fost verificat și ce nu
+## 7. Deploy pe Vercel
+
+1. **Supabase** (o dată): creează proiectul, rulează `supabase/schema.sql` în SQL
+   Editor, apoi **Authentication → Providers → Anonymous sign-ins: enabled**.
+   Fără pasul cu anonymous sign-ins nimic nu funcționează — nu există alt mod de
+   autentificare în aplicație.
+2. **Vercel → Add New → Project → Import Git Repository**, alege repo-ul. Nu
+   schimba nimic la Build Command sau Output Directory; Next.js e detectat
+   automat.
+3. **Environment Variables** — toate patru, pe Production *și* Preview:
+
+   | Variabilă | De unde |
+   | --- | --- |
+   | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | același loc, cheia `anon` |
+   | `SUPABASE_SERVICE_ROLE_KEY` | același loc, cheia `service_role` |
+   | `ANTHROPIC_API_KEY` | console.anthropic.com |
+
+   Opțional: `IP_HASH_SALT`, un șir aleator. Fără el limitarea per-IP
+   funcționează, dar hash-urile sunt ghicibile.
+4. **Deploy.** Dacă vrei să pornești de pe branch-ul de dezvoltare în loc de
+   `main`, pune-l ca Production Branch în Settings → Git.
+
+Note care contează:
+
+- `maxDuration` pe `/api/matchmaker` e **60**, plafonul planului Hobby. Peste
+  atât, deploy-ul e respins. Pe Pro poți urca la 300 — util dacă vrei mai multe
+  simulări per cerere.
+- `sharp` e dependență normală, Vercel o compilează singur. Nu e nevoie de
+  configurare.
+- `.env.local` e în `.gitignore`, deci nicio cheie nu ajunge în repo.
+
+---
+
+## 8. Ce a fost verificat și ce nu
 
 Fluxul complet a fost rulat cap-coadă într-un browser, pe un stack local
 (Postgres + GoTrue + PostgREST + Realtime): interviu → extracție → profil →
