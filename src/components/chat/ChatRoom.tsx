@@ -5,6 +5,8 @@ import Link from "next/link";
 
 import { RevealCard } from "@/components/chat/RevealCard";
 import { UnlockProgress } from "@/components/chat/UnlockProgress";
+import { BlurredFace } from "@/components/photo/BlurredFace";
+import { nextPhotoStage, stageFor } from "@/lib/photo";
 import { Button } from "@/components/ui/Button";
 import { Dot } from "@/components/ui/Eyebrow";
 import { cn } from "@/lib/cn";
@@ -144,6 +146,10 @@ export function ChatRoom({
     [counterpart, messages.length],
   );
 
+  const photoStage = stageFor(messages.length);
+  const upcomingPhoto = nextPhotoStage(messages.length);
+  const photoRemaining = upcomingPhoto ? upcomingPhoto.at - messages.length : 0;
+
   /** Messages, with each reveal slotted in where it was earned. */
   const timeline = useMemo<TimelineItem[]>(() => {
     const items: TimelineItem[] = [];
@@ -162,17 +168,24 @@ export function ChatRoom({
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header className="mx-auto w-full max-w-3xl px-6 pb-6 pt-12">
         <div className="flex items-end justify-between gap-6">
-          <div>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 text-[0.75rem] text-ghost transition-colors duration-500 hover:text-whisper"
-            >
-              <span aria-hidden>←</span> panoul
-            </Link>
-            <h1 className="mt-4 flex items-center gap-3 text-2xl font-medium tracking-[-0.03em] text-silver">
-              <Dot />
-              {subjectLabel(simulationId)}
-            </h1>
+          <div className="flex items-end gap-5">
+            <BlurredFace
+              simulationId={simulationId}
+              messageCount={messages.length}
+              className="shrink-0 [&>div]:size-20 sm:[&>div]:size-24"
+            />
+            <div>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 text-[0.75rem] text-ghost transition-colors duration-500 hover:text-whisper"
+              >
+                <span aria-hidden>←</span> panoul
+              </Link>
+              <h1 className="mt-4 flex items-center gap-3 text-2xl font-medium tracking-[-0.03em] text-silver">
+                <Dot />
+                {subjectLabel(simulationId)}
+              </h1>
+            </div>
           </div>
           {compatibilityScore !== null ? (
             <div className="text-right">
@@ -190,8 +203,12 @@ export function ChatRoom({
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
           <p className="text-[0.8125rem] leading-relaxed text-ghost">
-            Camera e anonimă. La fiecare 10 mesaje se deblochează un fragment din
-            celălalt — {reveals.length}/{REVEALS.length} până acum.
+            La fiecare 10 mesaje se deblochează un fragment din celălalt —{" "}
+            {reveals.length}/{REVEALS.length} până acum — și fotografia lui se
+            limpezește puțin. {photoStage.label.toLowerCase()}
+            {photoRemaining > 0
+              ? `, încă ${photoRemaining} ${photoRemaining === 1 ? "mesaj" : "mesaje"} până la următorul strat.`
+              : "."}
           </p>
           <span
             className="flex shrink-0 items-center gap-2 text-[0.625rem] uppercase tracking-[0.22em] text-ghost"

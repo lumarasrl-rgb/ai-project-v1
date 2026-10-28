@@ -29,3 +29,15 @@ export function supabaseAnonKey(): string {
 export function anthropicApiKey(): string {
   return required("ANTHROPIC_API_KEY", process.env.ANTHROPIC_API_KEY);
 }
+
+/**
+ * Server-only. Bypasses RLS, so it exists for exactly one job: reading the
+ * blurred face variants out of the private bucket after /api/photo has decided
+ * which one the conversation has earned.
+ */
+export function supabaseServiceRoleKey(): string {
+  return required(
+    "SUPABASE_SERVICE_ROLE_KEY",
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+  );
+}

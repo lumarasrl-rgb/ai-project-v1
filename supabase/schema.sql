@@ -31,7 +31,13 @@ create table if not exists public.profiles (
   created_at          timestamptz not null default now()
 );
 
-comment on table  public.profiles                    is 'Anonymous, photo-free user profiles.';
+-- The face, stored as a ladder of pre-blurred variants. `photo_path` is the
+-- folder in the private `faces` bucket, never a public URL — the image is only
+-- ever served through /api/photo, which decides how sharp it is allowed to be.
+alter table public.profiles
+  add column if not exists photo_path text;
+
+comment on table  public.profiles                    is 'Anonymous profiles. The face is blurred until a conversation earns it.';
 comment on column public.profiles.interests          is 'Keyword vector extracted from the interview by Claude.';
 comment on column public.profiles.introversion_score is '1 = deeply introverted · 5 = socially energetic.';
 comment on column public.profiles.bio_summary        is 'Short psychological portrait written by Claude.';
@@ -248,6 +254,55 @@ create policy "participants send messages"
   with check (
     sender_id = auth.uid()
     and public.is_simulation_participant(simulation_id)
+  );
+
+-- ─────────────────────────────────────────────────────────────────────────────────
+--  Storage — the blurred face ladder
+-- ─────────────────────────────────────────────────────────────────────────────────
+insert into storage.buckets (id, name, public)
+values ('faces', 'faces', false)
+on conflict (id) do nothing;
+
+/*
+ * Nobody reads this bucket through the storage API — not even the two people in
+ * a room. Every read goes through /api/photo, which checks how far the
+ * conversation has got before choosing which blur level to hand back. These
+ * policies only let someone manage their own folder.
+ */
+drop policy if exists "owners write their own face" on storage.objects;
+create policy "owners write their own face"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'faces'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "owners replace their own face" on storage.objects;
+create policy "owners replace their own face"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'faces'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "owners delete their own face" on storage.objects;
+create policy "owners delete their own face"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'faces'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "owners read their own face" on storage.objects;
+create policy "owners read their own face"
+  on storage.objects for select
+  to authenticated
+  using (
+    bucket_id = 'faces'
+    and (storage.foldername(name))[1] = auth.uid()::text
   );
 
 -- ─────────────────────────────────────────────────────────────────────────────────

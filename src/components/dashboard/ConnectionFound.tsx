@@ -1,5 +1,6 @@
 "use client";
 
+import { BlurredFace } from "@/components/photo/BlurredFace";
 import { Button, ButtonLink } from "@/components/ui/Button";
 import { Dot, Eyebrow } from "@/components/ui/Eyebrow";
 import { sharedInterests } from "@/lib/matching";
@@ -51,7 +52,16 @@ export function ConnectionFound({
             {subjectLabel(simulation.id)}
           </Eyebrow>
 
-          <h2 className="mt-8 text-[2.5rem] font-medium leading-[1.05] tracking-[-0.04em] text-silver sm:text-[3.5rem] animate-unveil">
+          {/* No caption here: the server decides the real stage from the
+              message count, which this card does not know. The image is
+              always correct; a label guessed from zero would not be. */}
+          <BlurredFace
+            simulationId={simulation.id}
+            messageCount={0}
+            className="mt-10 [&>div]:size-32 sm:[&>div]:size-40"
+          />
+
+          <h2 className="mt-10 text-[2.5rem] font-medium leading-[1.05] tracking-[-0.04em] text-silver sm:text-[3.5rem] animate-unveil">
             Conexiune Găsită
           </h2>
 

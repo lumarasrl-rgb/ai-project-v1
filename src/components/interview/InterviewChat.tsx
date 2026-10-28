@@ -34,9 +34,11 @@ export function InterviewChat() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
   const [inputReady, setInputReady] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement | null>(null);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const step = INTERVIEW_SCRIPT[stepIndex];
@@ -82,6 +84,16 @@ export function InterviewChat() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [entries.length, inputReady, submitting]);
 
+  /** The photo can only be attached once the profile row exists. */
+  const uploadPhoto = useCallback(async (file: File) => {
+    const body = new FormData();
+    body.append("photo", file);
+    const response = await fetch("/api/photo/upload", { method: "POST", body });
+    if (!response.ok) {
+      throw new Error("Profilul s-a creat, dar fotografia nu a putut fi urcată.");
+    }
+  }, []);
+
   const submitProfile = useCallback(
     async (allAnswers: Record<string, string>) => {
       setSubmitting(true);
@@ -119,6 +131,8 @@ export function InterviewChat() {
           throw new Error(message);
         }
 
+        if (photo) await uploadPhoto(photo);
+
         router.replace("/dashboard");
       } catch (cause: unknown) {
         setError(
@@ -127,7 +141,7 @@ export function InterviewChat() {
         setSubmitting(false);
       }
     },
-    [router],
+    [photo, router, uploadPhoto],
   );
 
   const commit = useCallback(
@@ -173,6 +187,7 @@ export function InterviewChat() {
           return `Încă ${step.minLength - value.length} caractere.`;
         return null;
       case "choice":
+      case "photo":
         return null;
     }
   }, [draft, step]);
@@ -277,6 +292,35 @@ export function InterviewChat() {
                     {option.label}
                   </Button>
                 ))}
+              </div>
+            ) : step.kind === "photo" ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 8 * 1024 * 1024) {
+                      setError("Fotografia depășește 8 MB.");
+                      return;
+                    }
+                    setPhoto(file);
+                    setError(null);
+                    commit("da", "Am ales o fotografie");
+                  }}
+                />
+                <Button onClick={() => fileInput.current?.click()}>
+                  Alege o fotografie
+                </Button>
+                <Button
+                  variant="quiet"
+                  onClick={() => commit("nu", "Mai târziu")}
+                >
+                  Mai târziu
+                </Button>
               </div>
             ) : (
               <div className="space-y-3">

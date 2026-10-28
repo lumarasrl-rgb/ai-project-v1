@@ -17,6 +17,7 @@ Next.js 15 (App Router) · TypeScript strict · Tailwind CSS v4 · Supabase · C
 | **Potrivire** | `POST /api/matchmaker` filtrează candidații (preferințe de gen reciproce + energie socială similară), apoi pune Claude să simuleze o discuție de exact 5 replici între cele două clone și să o noteze de la 1 la 100. |
 | **Conexiune** | Peste **85%** se deschide ecranul „Conexiune Găsită" și o cameră de chat anonimă. |
 | **Message Unlocker** | La fiecare 10 mesaje din cameră se deblochează un fragment din celălalt: ritm social → interese → portret → pseudonim → vârstă. |
+| **Fotografia care se limpezește** | Da, există fotografii — dar nimeni nu le vede de la început. La upload, poza e randată într-o scară de șase variante tot mai clare; camera primește doar varianta pe care numărul de mesaje a câștigat-o. Complet clară abia după 50 de mesaje. |
 
 ---
 
@@ -119,6 +120,15 @@ utilitarele (`glass`, `hairline`) sunt definite în `src/app/globals.css` prin
   livreze nimic (slot de replicare greșit configurat, socket căzut, tab adormit),
   iar o cameră care încremenește în tăcere e mai rea decât una cu câteva secunde
   întârziere. Indicatorul `live` / `sincronizare` arată care cale o duce.
+- **Fotografia: blurul e în pixeli, nu în CSS.** La upload, `sharp` randează șase
+  variante (sigma 24 → 14 → 8 → 4.5 → 2.2 → 0) și le urcă într-un bucket privat.
+  Originalul nu se păstrează: cel mai clar fișier din bucket e exact ce vede
+  cineva după 50 de mesaje. Imaginea se servește doar prin `/api/photo/[id]`,
+  care verifică întâi că ești în cameră, numără mesajele și alege singur
+  nivelul — clientul nu cere niciodată un nivel anume. O variantă mai clară nu e
+  ascunsă în browser, pur și simplu nu e trimisă. Pașii sunt spațiați
+  geometric, nu uniform: blurul se percepe logaritmic, iar o scară uniformă ar
+  arăta identic pe primele patru trepte și ar sări brusc la final.
 - **Limitarea cheltuielii AI.** Fiecare apel la Claude lasă un rând în `ai_usage`.
   Cum sesiunile anonime sunt gratuite și nelimitate, o cotă per utilizator n-ar fi
   nicio cotă — așa că se numără și per IP apelant, păstrat doar ca SHA-256 cu sare

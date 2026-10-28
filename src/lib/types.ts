@@ -30,6 +30,8 @@ export type Profile = {
   introversion_score: number;
   bio_summary: string | null;
   raw_interview: string | null;
+  /** Folder in the private `faces` bucket holding the blur ladder. */
+  photo_path: string | null;
   created_at: string;
 };
 
@@ -83,10 +85,14 @@ export interface Database {
     Tables: {
       profiles: {
         Row: Profile;
-        Insert: Omit<Profile, "created_at" | "bio_summary" | "raw_interview"> & {
+        Insert: Omit<
+          Profile,
+          "created_at" | "bio_summary" | "raw_interview" | "photo_path"
+        > & {
           created_at?: string;
           bio_summary?: string | null;
           raw_interview?: string | null;
+          photo_path?: string | null;
         };
         Update: Partial<Omit<Profile, "id">>;
         Relationships: [];

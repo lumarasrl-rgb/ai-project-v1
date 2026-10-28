@@ -36,7 +36,16 @@ export interface AgeStep extends BaseStep {
   placeholder: string;
 }
 
-export type InterviewStep = OpenStep | ChoiceStep | HandleStep | AgeStep;
+export interface PhotoStep extends BaseStep {
+  kind: "photo";
+}
+
+export type InterviewStep =
+  | OpenStep
+  | ChoiceStep
+  | HandleStep
+  | AgeStep
+  | PhotoStep;
 
 const GENDER_LABELS: Record<(typeof GENDERS)[number], string> = {
   female: "Femeie",
@@ -85,6 +94,15 @@ export const INTERVIEW_SCRIPT: readonly InterviewStep[] = [
       value,
       label: LOOKING_FOR_LABELS[value],
     })),
+  },
+  {
+    kind: "photo",
+    id: "photo",
+    says: [
+      "Acum fotografia. Da, SilentDate are fotografii — doar că nimeni nu o vede de la început.",
+      "O voi încețoșa atât de tare încât la început nu se distinge nimic. Se limpezește singură, pe măsură ce voi doi vorbiți: puțin la fiecare zece mesaje, complet abia după cincizeci.",
+      "Cealaltă persoană nu primește niciodată o versiune mai clară decât a meritat conversația. Nici dacă se pricepe la calculatoare.",
+    ],
   },
   {
     kind: "open",
