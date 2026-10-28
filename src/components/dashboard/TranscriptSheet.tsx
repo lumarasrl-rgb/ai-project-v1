@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Dot, Eyebrow } from "@/components/ui/Eyebrow";
@@ -23,15 +23,49 @@ export function TranscriptSheet({
   theirUsername,
   onClose,
 }: TranscriptSheetProps) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
+    const dialog = dialogRef.current;
+    const previouslyFocused = document.activeElement;
+
+    const focusable = () =>
+      Array.from(
+        dialog?.querySelectorAll<HTMLElement>(
+          'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      ).filter((element) => !element.hasAttribute("disabled"));
+
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      // Keep the keyboard inside the dialog while it is open.
+      const elements = focusable();
+      const first = elements[0];
+      const last = elements.at(-1);
+      if (!first || !last) return;
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
+
+    dialog?.focus();
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
+
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = "";
+      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
     };
   }, [onClose]);
 
@@ -50,7 +84,11 @@ export function TranscriptSheet({
         className="absolute inset-0 cursor-default bg-void/80 backdrop-blur-sm"
       />
 
-      <div className="relative m-0 flex max-h-[90dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-glass border border-white/[0.05] bg-ink/80 shadow-2xl shadow-black/60 backdrop-blur-md animate-rise sm:m-6 sm:rounded-glass">
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        className="relative m-0 flex max-h-[90dvh] w-full max-w-2xl flex-col overflow-hidden rounded-t-glass border border-white/[0.05] bg-ink/80 shadow-2xl shadow-black/60 backdrop-blur-md animate-rise sm:m-6 sm:rounded-glass"
+      >
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-48 opacity-70"
