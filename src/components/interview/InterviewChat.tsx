@@ -251,7 +251,9 @@ export function InterviewChat() {
             </div>
           ) : null}
 
-          <div ref={bottomRef} />
+          {/* Clears the sticky composer, so the newest bubble never lands
+              underneath it. */}
+          <div ref={bottomRef} className="h-20" />
         </div>
       </main>
 

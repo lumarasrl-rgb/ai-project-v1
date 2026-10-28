@@ -256,7 +256,10 @@ export function ChatRoom({
               </div>
             ),
           )}
-          <div ref={bottomRef} />
+          {/* The composer is sticky, so scrolling to the end would otherwise
+              park the last message underneath it. This spacer is what the
+              scroll lands on instead. */}
+          <div ref={bottomRef} className="h-24" />
         </div>
       </main>
 
