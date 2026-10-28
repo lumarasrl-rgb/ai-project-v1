@@ -34,7 +34,12 @@ npm run dev
 NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
 ANTHROPIC_API_KEY=sk-ant-...        # doar pe server, niciodată NEXT_PUBLIC_
+IP_HASH_SALT=<șir aleator>          # opțional local, obligatoriu în producție
 ```
+
+> Atenție: Next.js nu suprascrie variabilele deja prezente în `process.env` cu
+> cele din `.env.local`. Dacă rulezi într-un mediu care injectează propriile
+> variabile, ele câștigă.
 
 ### Supabase
 
@@ -108,8 +113,19 @@ utilitarele (`glass`, `hairline`) sunt definite în `src/app/globals.css` prin
   intervine o singură dată, la final, ca să citească tot.
 - **Message Unlocker** numără mesajele din cameră (ale amândurora), ca indiciile să
   se deblocheze simultan pentru cei doi.
-- **Realtime.** Camera anonimă ascultă `INSERT`-urile pe `messages` prin Supabase
-  Realtime; mesajele proprii sunt deduplicate după `id`.
+- **Realtime, cu plasă de siguranță.** Camera ascultă `INSERT`-urile pe `messages`
+  prin Supabase Realtime, dar reconciliază și pe cronometru — la 20s cât socket-ul
+  e sănătos, la 5s cât nu e. Un canal poate raporta `SUBSCRIBED` și totuși să nu
+  livreze nimic (slot de replicare greșit configurat, socket căzut, tab adormit),
+  iar o cameră care încremenește în tăcere e mai rea decât una cu câteva secunde
+  întârziere. Indicatorul `live` / `sincronizare` arată care cale o duce.
+- **Limitarea cheltuielii AI.** Fiecare apel la Claude lasă un rând în `ai_usage`.
+  Cum sesiunile anonime sunt gratuite și nelimitate, o cotă per utilizator n-ar fi
+  nicio cotă — așa că se numără și per IP apelant, păstrat doar ca SHA-256 cu sare
+  (`IP_HASH_SALT`), niciodată în clar. Plafoanele stau în funcția SQL
+  `claim_ai_usage`, nu în aplicație: funcția e expusă prin PostgREST, deci
+  apelantul nu trebuie să-și poată trimite propriul plafon. Implicit: 5 interviuri
+  și 20 de simulări pe zi per utilizator, 25 și 100 per IP.
 
 ---
 
@@ -120,4 +136,25 @@ npm run dev         # development
 npm run build       # build de producție
 npm run start       # rulează build-ul
 npm run typecheck   # tsc --noEmit
+npm test            # testele logicii pure (node:test, fără dependențe)
 ```
+
+Testele acoperă `matching.ts`, `unlocks.ts` și `transcript.ts` — adică
+algoritmul de potrivire, Message Unlocker-ul și parsarea transcrierii venite de
+la Claude. Rulează pe runner-ul din Node, fără framework instalat.
+
+---
+
+## 7. Ce a fost verificat și ce nu
+
+Fluxul complet a fost rulat cap-coadă într-un browser, pe un stack local
+(Postgres + GoTrue + PostgREST + Realtime): interviu → extracție → profil →
+potrivire → simulări salvate → ecranul de conexiune → cameră → indiciu deblocat
+la al zecelea mesaj → mesajul celuilalt ajuns în pagina deschisă fără reload.
+Schema, politicile RLS și cheile externe sunt verificate pe Postgres real.
+
+**Nu a fost verificată calitatea răspunsurilor lui Claude.** Rularea s-a făcut cu
+un server-mock pus pe `ANTHROPIC_BASE_URL`, deci codul rutelor, validarea zod și
+scrierile în bază sunt reale, dar scorurile și transcrierile au fost fabricate.
+Cât de bine extrage Claude interesele și cât de credibile sunt simulările rămâne
+de văzut la prima rulare cu o cheie adevărată.
